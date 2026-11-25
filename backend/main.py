@@ -1,18 +1,14 @@
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
-import os
-from fastapi import Request
 from pydantic import BaseModel, Field
 from typing import Optional
-from datetime import datetime, timezone
+import os
 import time
 
-from database import save_message, get_messages
+from database import init_db, save_message, get_messages, get_connection
 from llm import get_ai_response
-
-from database import init_db, get_messages, get_connection
 
 load_dotenv()
 
@@ -32,10 +28,13 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-origins = os.getenv(
-    "ALLOWED_ORIGINS",
-    "http://localhost:3000"
-).split(",")
+origins = [
+    origin.strip()
+    for origin in os.getenv(
+        "ALLOWED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173"
+    ).split(",")
+]
 
 app.add_middleware(
     CORSMiddleware,
@@ -111,9 +110,9 @@ def chat(
 
     messages.append({"role": "user", "content": message})
 
-    simulation = x_simulate_failure
+    simulation = None
     if os.getenv("ENABLE_FAILURE_SIMULATION", "false").lower() == "true":
-        simulation = http_request.headers.get("X-Simulate-Failure")
+        simulation = x_simulate_failure
 
     start_time = time.perf_counter()
 
